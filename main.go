@@ -215,6 +215,13 @@ func main() {
 	// Write the header
 	writer.Write([]string{"Package", "Distribution", "Size"})
 
+	// flush the writer every 10 milliseconds
+	go func() {
+		for {
+			time.Sleep(10 * time.Millisecond)
+			writer.Flush()
+		}
+	}()
 	for _, pkg := range packages {
 		tasksGroup.Add(1)
 
@@ -239,5 +246,7 @@ func main() {
 		time.Sleep(PACKAGE_ITERATION_DELAY)
 	}
 	tasksGroup.Wait()
+	writer.Flush()
 	f.Close()
+
 }
