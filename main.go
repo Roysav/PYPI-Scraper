@@ -14,6 +14,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -27,6 +28,7 @@ const (
 	LOG_INTERVAL            = 1 * time.Second
 	MAX_CONCURRENT_REQUESTS = 10000
 	REQUEST_RETRY_DELAY     = 1 * time.Second
+	PACKAGE_ITERATION_DELAY = 1 * time.Microsecond
 )
 
 // Used for limiting concurrent requests
@@ -42,13 +44,6 @@ type RequestManager struct {
 	// Time to sleep when the maximum number of concurrent requests is reached
 	// after which the request will be tried again
 	requestRetryDelay time.Duration
-}
-
-func NewRequestManager(maxConcurrentRequests int64, requestRetryDelay time.Duration) *RequestManager {
-	return &RequestManager{
-		maxConcurrentRequests: maxConcurrentRequests,
-		requestRetryDelay:     requestRetryDelay,
-	}
 }
 
 func (client *RequestManager) getRunningRequests() int64 {
@@ -181,7 +176,10 @@ func main() {
 		panic(err)
 	}
 
-	requestManager := NewRequestManager(MAX_CONCURRENT_REQUESTS, REQUEST_RETRY_DELAY)
+	requestManager := &RequestManager{
+		maxConcurrentRequests: MAX_CONCURRENT_REQUESTS,
+		requestRetryDelay:     REQUEST_RETRY_DELAY,
+	}
 	tasksGroup := sync.WaitGroup{}
 
 	// Counters for the progress
@@ -191,10 +189,13 @@ func main() {
 
 	packagesCount := len(packages)
 
+	logger := log.Default()
+	logger.SetPrefix("\033[1A\033[K")
+
 	// Continuously print the progress
 	go func() {
 		for {
-			fmt.Printf(
+			logger.Printf(
 				"Scraped %d/%d packages, Distributions found: %d, Total size: %d GB\n",
 				packagesScraped.Load(), packagesCount, distributionsFound.Load(), totalSizeBytes.Load()/1_000_000_000,
 			)
@@ -232,7 +233,7 @@ func main() {
 			tasksGroup.Done()
 
 		}(pkg)
-		time.Sleep(1 * time.Millisecond)
+		time.Sleep(PACKAGE_ITERATION_DELAY)
 	}
 	tasksGroup.Wait()
 	f.Close()
