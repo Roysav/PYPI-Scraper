@@ -12,6 +12,7 @@
 package main
 
 import (
+	"encoding/csv"
 	"fmt"
 	"io"
 	"log"
@@ -209,8 +210,10 @@ func main() {
 		panic(err)
 	}
 
+	writer := csv.NewWriter(f)
+
 	// Write the header
-	_, err = f.WriteString("package,distribution,size_bytes\n")
+	writer.Write([]string{"Package", "Distribution", "Size"})
 
 	for _, pkg := range packages {
 		tasksGroup.Add(1)
@@ -228,7 +231,7 @@ func main() {
 				if err != nil {
 					panic(err)
 				}
-				_, err = f.WriteString(fmt.Sprintf("%s,%s,%d\n", pkg.name, distribution.name, size))
+				writer.Write([]string{pkg.name, distribution.name, fmt.Sprintf("%d", size)})
 			}
 			tasksGroup.Done()
 
