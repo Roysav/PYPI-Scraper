@@ -12,14 +12,14 @@
 package main
 
 import (
-	"encoding/csv"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
 	"regexp"
+	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -171,6 +171,11 @@ func getPackages(registry_url string) (packages []Package, err error) {
 	return packages, nil
 }
 
+func csvQuote(s string) string {
+	s = strings.Replace(s, "\"", "\"\"", -1)
+	return "\"" + s + "\""
+}
+
 func main() {
 	packages, err := getPackages("https://pypi.org/simple/")
 	if err != nil {
@@ -210,18 +215,6 @@ func main() {
 		panic(err)
 	}
 
-	writer := csv.NewWriter(f)
-
-	// Write the header
-	writer.Write([]string{"Package", "Distribution", "Size"})
-
-	// flush the writer every 10 milliseconds
-	go func() {
-		for {
-			time.Sleep(10 * time.Millisecond)
-			writer.Flush()
-		}
-	}()
 	for _, pkg := range packages {
 		tasksGroup.Add(1)
 
@@ -238,7 +231,11 @@ func main() {
 				if err != nil {
 					panic(err)
 				}
-				writer.Write([]string{pkg.name, distribution.name, fmt.Sprintf("%d", size)})
+				_, err = f.WriteString(csvQuote(pkg.name) + "," + csvQuote(distribution.name) + "," + csvQuote(distribution.url) + "," + strconv.Itoa(size) + "\n")
+				if err != nil {
+					panic(err)
+				}
+
 			}
 			tasksGroup.Done()
 
@@ -246,7 +243,6 @@ func main() {
 		time.Sleep(PACKAGE_ITERATION_DELAY)
 	}
 	tasksGroup.Wait()
-	writer.Flush()
 	f.Close()
 
 }
